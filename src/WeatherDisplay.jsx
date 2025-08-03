@@ -66,11 +66,9 @@ function WeatherDisplay({ onWeatherChange }) {
       const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=imperial`
       
       const response = await fetch(url)
-      console.log("API Response status:", response.status)
       
       if (!response.ok) {
         const errorData = await response.json()
-        console.log("API Error data:", errorData)
         throw new Error(errorData.message || 'Weather data not found')
       }
       
@@ -87,7 +85,6 @@ function WeatherDisplay({ onWeatherChange }) {
       }
       
     } catch (err) {
-      console.log("API Error:", err)
       setError(`Failed to fetch weather data: ${err.message}`)
     } finally {
       setLoading(false)
