@@ -13,6 +13,7 @@ function WeatherDisplay({ onWeatherChange }) {
   
   // NEW: State for city search
   const [cityInput, setCityInput] = useState("")
+  const [gettingLocation, setGettingLocation] = useState(false)
 
   // Helper function to convert Fahrenheit to Celsius
   const fahrenheitToCelsius = (fahrenheit) => {
@@ -66,9 +67,11 @@ function WeatherDisplay({ onWeatherChange }) {
       const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${apiKey}&units=imperial`
       
       const response = await fetch(url)
+      console.log("API Response status:", response.status)
       
       if (!response.ok) {
         const errorData = await response.json()
+        console.log("API Error data:", errorData)
         throw new Error(errorData.message || 'Weather data not found')
       }
       
@@ -85,6 +88,7 @@ function WeatherDisplay({ onWeatherChange }) {
       }
       
     } catch (err) {
+      console.log("API Error:", err)
       setError(`Failed to fetch weather data: ${err.message}`)
     } finally {
       setLoading(false)
@@ -101,6 +105,82 @@ function WeatherDisplay({ onWeatherChange }) {
     }
   }
 
+  // NEW: Function to get user's current location
+  const getCurrentLocationWeather = () => {
+    setGettingLocation(true)
+    setError("")
+
+    // Check if geolocation is supported
+    if (!navigator.geolocation) {
+      setError("Geolocation is not supported by this browser.")
+      setGettingLocation(false)
+      return
+    }
+
+    // Get current position
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords
+          
+          // Fetch weather using coordinates instead of city name
+          const apiKey = "26b86b4753a292649c4401412e936a79"
+          const url = `https://api.openweathermap.org/data/2.5/weather?lat=${latitude}&lon=${longitude}&appid=${apiKey}&units=imperial`
+          
+          setLoading(true)
+          const response = await fetch(url)
+          
+          if (!response.ok) {
+            const errorData = await response.json()
+            throw new Error(errorData.message || 'Weather data not found')
+          }
+          
+          const data = await response.json()
+          
+          // Update state with location-based weather
+          setTemperature(Math.round(data.main.temp))
+          setLocation(`${data.name}, ${data.sys.country}`)
+          setCondition(data.weather[0].main)
+          
+          // Notify parent component for background animation
+          if (onWeatherChange) {
+            onWeatherChange(data.weather[0].main.toLowerCase())
+          }
+          
+        } catch (err) {
+          setError(`Failed to fetch weather data: ${err.message}`)
+        } finally {
+          setLoading(false)
+          setGettingLocation(false)
+        }
+      },
+      (error) => {
+        // Handle geolocation errors
+        let errorMessage = "Unable to retrieve your location."
+        
+        switch(error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = "Location access denied. Please enable location permissions."
+            break
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = "Location information is unavailable."
+            break
+          case error.TIMEOUT:
+            errorMessage = "Location request timed out."
+            break
+        }
+        
+        setError(errorMessage)
+        setGettingLocation(false)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 300000 // 5 minutes
+      }
+    )
+  }
+
   return (
     <div className="max-w-md mx-auto bg-white/95 backdrop-blur-md rounded-xl shadow-xl border border-white/30 relative z-50 overflow-hidden">
       <div className="p-6">
@@ -108,7 +188,7 @@ function WeatherDisplay({ onWeatherChange }) {
         
         {/* NEW: City search form */}
         <form onSubmit={handleCitySearch} className="mb-4">
-          <div className="flex space-x-2">
+          <div className="flex space-x-2 mb-3">
             <input
               type="text"
               value={cityInput}
@@ -122,10 +202,29 @@ function WeatherDisplay({ onWeatherChange }) {
               className={`px-4 py-2 rounded-lg font-medium transition-colors ${
                 loading || !cityInput.trim()
                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-green-500 hover:bg-green-600 text-white'
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
               }`}
             >
               Search
+            </button>
+          </div>
+          
+          {/* NEW: Current Location Button */}
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={getCurrentLocationWeather}
+              disabled={loading || gettingLocation}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors flex items-center space-x-2 ${
+                loading || gettingLocation
+                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                  : 'bg-green-500 hover:bg-green-600 text-white'
+              }`}
+            >
+              <span>📍</span>
+              <span>
+                {gettingLocation ? 'Getting Location...' : 'Use My Location'}
+              </span>
             </button>
           </div>
         </form>
